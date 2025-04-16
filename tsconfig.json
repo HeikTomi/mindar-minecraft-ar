@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES6", // Kohdistetaan moderniin JavaScript-versioon
+    "module": "ESNext", // Käytetään ES-moduuleja
+    "moduleResolution": "Node", // Node-tyylinen moduuliresoluutio
+    "strict": true, // Ota käyttöön tiukat tarkistukset
+    "esModuleInterop": true, // Salli CommonJS- ja ES-moduulien yhteensopivuus
+    "allowSyntheticDefaultImports": true, // Salli oletustuonnit
+    "resolveJsonModule": true, // Salli JSON-tiedostojen tuonti
+    "skipLibCheck": true, // Ohita kirjastojen tyypitysten tarkistus
+    "forceConsistentCasingInFileNames": true, // Varmista tiedostonimien kirjainkoon yhdenmukaisuus
+    "outDir": "./dist", // Käännettyjen tiedostojen sijainti
+    "rootDir": "./src", // Lähdekoodin juurihakemisto
+    "typeRoots": ["./node_modules/@types", "./@types"], // Mukautettujen tyypitysten sijainti
+    "types": ["node", "mindar-face-three"], // Käytettävät tyypit
+    "baseUrl": ".", // Peruspolku moduulien resoluutiolle
+    "paths": {
+      "*": ["node_modules/*", "./@types/*"] // Etsi moduuleja näistä sijainneista
+    }
+  },
+  "include": ["src/**/*"], // Sisällytä kaikki lähdekooditiedostot
+  "exclude": ["node_modules"] // Älä sisällytä node_modules-kansiota
+}

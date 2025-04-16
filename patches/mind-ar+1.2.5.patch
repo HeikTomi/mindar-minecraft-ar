@@ -1,0 +1,11 @@
+diff --git a/node_modules/mind-ar/dist/mindar-face-three.prod.js b/node_modules/mind-ar/dist/mindar-face-three.prod.js
+index b9c785b..8c01723 100644
+--- a/node_modules/mind-ar/dist/mindar-face-three.prod.js
++++ b/node_modules/mind-ar/dist/mindar-face-three.prod.js
+@@ -1,5 +1,5 @@
+ import { Scene as m, WebGLRenderer as g, sRGBEncoding as y, PerspectiveCamera as w, Mesh as M, MeshStandardMaterial as b, Group as p, BufferGeometry as x, BufferAttribute as A } from "three";
+-import { CSS3DRenderer as E } from "three/addons/renderers/CSS3DRenderer.js";
++import { CSS3DRenderer as E } from "three/examples/jsm/renderers/CSS3DRenderer.js";
+ import { C as R } from "./controller-d1-OMKPY.js";
+ import { U as S } from "./ui-fBadYuor.js";
+ const I = { BufferGeometry: x, BufferAttribute: A };

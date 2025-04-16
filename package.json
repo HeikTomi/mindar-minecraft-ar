@@ -1,0 +1,25 @@
+{
+  "name": "mindar-minecraft-ar",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "patch-package",
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/three": "^0.175.0",
+    "patch-package": "^8.0.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.0"
+  },
+  "dependencies": {
+    "mind-ar": "^1.2.5",
+    "nvm": "^0.0.4",
+    "three": "^0.136.0"
+  }
+}
