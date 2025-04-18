@@ -7,6 +7,11 @@ const reticle = new Mesh(reticleGeometry, reticleMaterial);
 reticle.visible = false;
 scene.add(reticle);
 
+// reticle.ts
+export let hitTestSourceAvailable = false;
+export let hitTestSource: XRHitTestSource | null = null;
+export let localReferenceSpace: XRReferenceSpace | null = null;
+
 const updateReticle = (frame: XRFrame) => {
   if (!hitTestSourceAvailable || !hitTestSource || !localReferenceSpace) return;
 

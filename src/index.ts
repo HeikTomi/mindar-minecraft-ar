@@ -4,6 +4,16 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { ARButton } from "three/examples/jsm/webxr/ARButton";
 import { CSS2DRenderer, CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer";
 
+// Tila, joka kertoo, onko animaatio käynnissä
+let isAnimating = false;
+
+// Luo hit-test-lähde WebXR:ssä
+let hitTestSourceAvailable = false;
+let hitTestSource: XRHitTestSource | null = null;
+let localReferenceSpace: XRReferenceSpace | null = null;
+
+/* SCENE, CAMERA, LIGHTS, RENDERER, CSS2DRENDERER */
+
 // Luo Three.js-scene ja kamera
 const scene = new Scene();
 const camera = new PerspectiveCamera(
@@ -22,6 +32,9 @@ const directionalLight = new DirectionalLight(0xffffff, 1); // Suunnattu valo
 directionalLight.position.set(0, 1, 1);
 scene.add(directionalLight);
 
+// Lisää kamera sceneen, jotta painikkeet näkyvät
+scene.add(camera);
+
 // Luo renderer
 const renderer = new WebGLRenderer({ alpha: true }); // Alpha mahdollistaa läpinäkyvän taustan
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -36,6 +49,34 @@ labelRenderer.domElement.style.position = "absolute";
 labelRenderer.domElement.style.top = "0";
 document.body.appendChild(labelRenderer.domElement);
 
+// Luo 3D-mallin lataaja
+const loader = new GLTFLoader();
+
+/* UI ELEMENTS */
+
+// Luo alkunäyttöelementti
+const coverScreen = document.createElement("div");
+coverScreen.id = "coverScreen"; // Aseta ID, jotta elementti voidaan helposti löytää
+coverScreen.style.position = "fixed";
+coverScreen.style.top = "0";
+coverScreen.style.left = "0";
+coverScreen.style.width = "100%";
+coverScreen.style.height = "100%";
+coverScreen.style.backgroundImage = "url('./assets/cover.png')"; // Aseta taustakuva
+coverScreen.style.backgroundSize = "cover"; // Skaalaa kuva täyttämään koko näyttö
+coverScreen.style.backgroundPosition = "center";
+coverScreen.style.zIndex = "1";
+coverScreen.style.display = "flex";
+coverScreen.style.justifyContent = "center";
+coverScreen.style.alignItems = "center";
+coverScreen.style.color = "white";
+coverScreen.style.fontSize = "2em";
+coverScreen.style.fontFamily = "sans-serif";
+coverScreen.style.cursor = "pointer";
+
+// Lisää alkunäyttöelementti bodyyn
+document.body.appendChild(coverScreen);
+
 // Lisää WebXR-painike DOM Overlay -tuella
 document.body.appendChild(
   ARButton.createButton(renderer, {
@@ -43,43 +84,6 @@ document.body.appendChild(
     domOverlay: { root: document.body }, // Aseta HTML-elementtien juuri
   })
 );
-
-// Luo 3D-mallin lataaja
-const loader = new GLTFLoader();
-
-// Funktio 3D-mallin (aseen ja hakun) lataamiseen
-const loadModel = (modelPath: string) => {
-  if(isAnimating) return; // Estä lataus, jos animaatio on käynnissä
-  
-  loader.load(
-    modelPath,
-    (gltf) => {
-      // Poista vanha ase, jos sellainen on
-      const oldWeapon = camera.getObjectByName("weapon");
-      if (oldWeapon) {
-        camera.remove(oldWeapon);
-      }
-
-      // Lisää uusi ase kameran lapseksi
-      const weapon = gltf.scene;
-      weapon.name = "weapon";
-      weapon.userData.assetPath = modelPath; // Tallenna tiedostopolku tunnisteeksi
-      weapon.position.set(0, -0.5, -1.75); // Aseta ase kameran eteen
-      weapon.scale.set(0.3, 0.3, 0.3); // Skaalaa ase sopivaksi
-      camera.add(weapon);
-
-      // Käynnistä idle-pyöritys
-      rotateWeaponIdle(weapon);
-    },
-    undefined,
-    (error) => {
-      console.error("Error loading model:", error);
-    }
-  );
-};
-
-// Lisää kamera sceneen, jotta painikkeet näkyvät
-scene.add(camera);
 
 // Luo hakku-painike HTML-elementtinä
 const pickaxeButtonDiv = document.createElement("div");
@@ -141,6 +145,288 @@ swordButtonDiv.onclick = () => {
 
 // Lisää hakku-painike DOM:iin
 document.body.appendChild(swordButtonDiv);
+
+// Funktio 3D-mallin (aseen ja hakun) lataamiseen
+const loadModel = (modelPath: string) => {
+  if(isAnimating) return; // Estä lataus, jos animaatio on käynnissä
+  
+  loader.load(
+    modelPath,
+    (gltf) => {
+      // Poista vanha ase, jos sellainen on
+      const oldWeapon = camera.getObjectByName("weapon");
+      if (oldWeapon) {
+        camera.remove(oldWeapon);
+      }
+
+      // Lisää uusi ase kameran lapseksi
+      const weapon = gltf.scene;
+      weapon.name = "weapon";
+      weapon.userData.assetPath = modelPath; // Tallenna tiedostopolku tunnisteeksi
+      weapon.position.set(0, -0.5, -1.75); // Aseta ase kameran eteen
+      weapon.scale.set(0.3, 0.3, 0.3); // Skaalaa ase sopivaksi
+      camera.add(weapon);
+
+      // Käynnistä idle-pyöritys
+      rotateWeaponIdle(weapon);
+    },
+    undefined,
+    (error) => {
+      console.error("Error loading model:", error);
+    }
+  );
+};
+
+// Luo kello-elementti
+const clockDiv = document.createElement("div");
+clockDiv.style.position = "absolute";
+clockDiv.style.top = "10px";
+clockDiv.style.right = "10px";
+clockDiv.style.color = "white";
+clockDiv.style.fontSize = "20px";
+clockDiv.style.fontFamily = "Arial, sans-serif";
+clockDiv.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+clockDiv.style.padding = "5px 10px";
+clockDiv.style.borderRadius = "5px";
+clockDiv.style.zIndex = "1000"; // Näytä UI muiden elementtien päällä
+clockDiv.innerText = "Alive: 0m 0s";
+
+// Lisää kello DOM:iin
+document.body.appendChild(clockDiv);
+
+// Luo scores-elementti
+const scoresDiv = document.createElement("div");
+scoresDiv.style.position = "absolute";
+scoresDiv.style.top = "50px";
+scoresDiv.style.right = "10px";
+scoresDiv.style.color = "white";
+scoresDiv.style.fontSize = "20px";
+scoresDiv.style.fontFamily = "Arial, sans-serif";
+scoresDiv.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+scoresDiv.style.padding = "5px 10px";
+scoresDiv.style.borderRadius = "5px";
+scoresDiv.style.zIndex = "1000"; // Näytä UI muiden elementtien päällä
+scoresDiv.innerText = "Score: 0";
+
+// Lisää pisteet DOM:iin
+document.body.appendChild(scoresDiv);
+
+let score = 0; // Alustetaan pisteet
+
+const updateScores = (newScore: number) => {
+  score += newScore;
+  scoresDiv.innerText = `Score: ${score}`;
+};
+
+// Päivitä kello reaaliajassa
+let startTime = Date.now();
+const updateClock = () => {
+  const elapsedTime = Date.now() - startTime;
+  const minutes = Math.floor(elapsedTime / 60000);
+  const seconds = Math.floor((elapsedTime % 60000) / 1000);
+  clockDiv.innerText = `Alive: ${minutes}m ${seconds}s`;
+};
+
+// Luo elämät-elementti
+const livesDiv = document.createElement("div");
+livesDiv.style.position = "absolute";
+livesDiv.style.top = "10px";
+livesDiv.style.left = "10px";
+livesDiv.style.display = "flex";
+livesDiv.style.gap = "5px"; // Väli sydänten välillä
+livesDiv.style.zIndex = "1000"; // Näytä UI muiden elementtien päällä
+
+// Lisää 4 sydäntä
+const maxLives = 4;
+let currentLives = maxLives;
+
+for (let i = 0; i < maxLives; i++) {
+  const heart = document.createElement("img");
+  heart.src = "./assets/heart.png"; // Sydänkuvan polku
+  heart.style.width = "30px"; // Sydämen leveys
+  heart.style.height = "30px"; // Sydämen korkeus
+  livesDiv.appendChild(heart);
+}
+
+// Lisää elämät DOM:iin
+document.body.appendChild(livesDiv);
+
+const updateLivesUI = () => {
+  const hearts = livesDiv.querySelectorAll("img");
+  hearts.forEach((heart, index) => {
+    if (index < currentLives) {
+      heart.style.opacity = "1"; // Näytä sydän
+    } else {
+      heart.style.opacity = "0.3"; // Himmennä sydän
+    }
+  });
+};
+
+// Luo inventaario-elementti
+const inventoryDiv = document.createElement("div");
+inventoryDiv.style.position = "absolute";
+inventoryDiv.style.top = "50%"; // Keskelle pystysuunnassa
+inventoryDiv.style.right = "10px"; // Näytön oikeaan reunaan
+inventoryDiv.style.transform = "translateY(-50%)"; // Keskitys pystysuunnassa
+inventoryDiv.style.display = "flex";
+inventoryDiv.style.flexDirection = "column"; // Järjestä blokit pystysuoraan
+inventoryDiv.style.gap = "10px"; // Väli blokkien välillä
+inventoryDiv.style.zIndex = "1000"; // Näytä UI muiden elementtien päällä
+
+// Blokkien tiedot
+const blocks = [
+  { name: "beige", imagePath: "./assets/minecraft_blocks_beige.png", modelPath: "./assets/minecraft_blocks_beige.glb", count: 1 },
+  { name: "brown", imagePath: "./assets/minecraft_blocks_brown.png", modelPath: "./assets/minecraft_blocks_brown.glb", count: 1 },
+  { name: "green", imagePath: "./assets/minecraft_blocks_green.png", modelPath: "./assets/minecraft_blocks_green.glb", count: 1 },
+  { name: "grey", imagePath: "./assets/minecraft_blocks_grey.png", modelPath: "./assets/minecraft_blocks_grey.glb", count: 1 },
+];
+
+// Luo blokit inventaarioon
+blocks.forEach((block) => {
+  const blockDiv = document.createElement("div");
+  blockDiv.classList.add("inventory-item"); // Lisää luokka
+  blockDiv.dataset.blockName = block.name; // Lisää data-attribuutti
+  blockDiv.style.display = "flex";
+  blockDiv.style.flexDirection = "column";
+  blockDiv.style.alignItems = "center";
+  blockDiv.style.cursor = "pointer";
+
+  // Blokin kuva tekstuuri
+  const blockModelDiv = document.createElement("div");
+  blockModelDiv.style.width = "50px";
+  blockModelDiv.style.height = "50px";
+  blockModelDiv.style.backgroundImage = `url('${block.imagePath}')`; // Esikatselukuva
+  blockModelDiv.style.backgroundSize = "cover";
+  blockModelDiv.style.border = "1px solid black";
+  blockModelDiv.style.borderRadius = "5px";
+  blockDiv.appendChild(blockModelDiv);
+
+  // Blokin määrä
+  const blockCount = document.createElement("span");
+  blockCount.classList.add("block-count"); // Lisää luokka
+  blockCount.innerText = `${block.count}`; // Näytä blokin määrä
+  blockCount.style.position = "relative";
+  blockCount.style.top = "30px";
+  blockCount.style.left = "35px";
+  blockCount.style.color = "white";
+  blockCount.style.fontSize = "14px";
+  blockCount.style.fontWeight = "bold";
+  blockCount.style.textShadow = "0 0 5px black"; // Lisää kontrastia
+  blockModelDiv.appendChild(blockCount);
+
+  // Lisää klikkaustoiminnallisuus
+  blockDiv.onclick = () => {
+    if (block.count > 0 && reticle.visible) { // Tarkista, että blokkeja on ja reticle on näkyvissä
+      console.log(`Clicked on block: ${block.name}`);
+      // Lataa blokki ja aseta se rectilen sijaintiin
+      loader.load(
+        block.modelPath,
+        (gltf) => {
+          const blockObject = gltf.scene;
+          blockObject.name = "block";
+          blockObject.scale.set(0.7, 0.7, 0.7); // Skaalaa blokki sopivaksi
+
+          // Laske blokin korkeus dynaamisesti
+          const boundingBox = new Box3().setFromObject(blockObject);
+          const blockHeight = boundingBox.max.y - boundingBox.min.y;
+
+          // Tarkista, onko rectilen sijainnissa jo blokki
+          let highestY = reticle.position.y; // Alkuarvo on rectilen korkeus
+          scene.traverse((object) => {
+            if (object.name === "block") {
+              // Lasketaan vain vaakasuora etäisyys (x ja z)
+              const horizontalDistance = Math.sqrt(
+                Math.pow(object.position.x - reticle.position.x, 2) +
+                Math.pow(object.position.z - reticle.position.z, 2)
+              );
+              if (horizontalDistance < 0.2) { // Jos blokki on tarpeeksi lähellä rectilen sijaintia
+                highestY = Math.max(highestY, object.position.y + blockHeight); // Aseta uusi korkeus edellisen blokin päälle
+              }
+            }
+          });
+
+          // Aseta blokki rectilen sijaintiin tai edellisen päälle
+          blockObject.position.set(reticle.position.x, highestY, reticle.position.z);
+          scene.add(blockObject);
+
+          updateScores(25); // Lisää pisteitä, kun blokki asetetaan
+          console.log(`Placed block: ${block.name} at reticle position.`);
+        },
+        undefined,
+        (error) => {
+          console.error("Error loading block model:", error);
+        }
+      );
+
+      // Vähennä inventaariosta
+      block.count--;
+      blockCount.innerText = `${block.count}`;
+    } else if (!reticle.visible) {
+      console.log("Reticle is not visible. Cannot place block.");
+    } else {
+      console.log(`No ${block.name} blocks left in inventory.`);
+    }
+  };
+
+  inventoryDiv.appendChild(blockDiv);
+});
+
+// Lisää inventaario DOM:iin
+document.body.appendChild(inventoryDiv);
+
+// Piilota UI-elementit aluksi
+inventoryDiv.style.display = "none";
+clockDiv.style.display = "none";
+scoresDiv.style.display = "none";
+livesDiv.style.display = "none";
+
+let clockInterval: ReturnType<typeof setInterval> | null = null;
+let scoreInterval: ReturnType<typeof setInterval> | null = null;
+
+// Lisää WebXR-istunnon aloituskuuntelija
+renderer.xr.addEventListener("sessionstart", () => {
+  console.log("WebXR session started");
+
+  // Piilota alkunäyttöelementti
+  coverScreen.style.display = "none";
+
+  // Näytä UI-elementit
+  inventoryDiv.style.display = "flex";
+  clockDiv.style.display = "block";
+  scoresDiv.style.display = "block";
+  livesDiv.style.display = "flex";
+
+  // Käynnistä kellon ja pisteiden päivitys
+  startTime = Date.now();
+  clockInterval = setInterval(updateClock, 1000);
+  scoreInterval = setInterval(() => {
+    updateScores(10);
+  }, 5000);
+});
+
+// Lisää WebXR-istunnon lopetuskuuntelija
+renderer.xr.addEventListener("sessionend", () => {
+  console.log("WebXR session ended");
+
+  // Näytä alkunäyttöelementti
+  coverScreen.style.display = "flex";
+
+  // Piilota UI-elementit
+  inventoryDiv.style.display = "none";
+  clockDiv.style.display = "none";
+  scoresDiv.style.display = "none";
+  livesDiv.style.display = "none";
+
+  // Pysäytä kellon ja pisteiden päivitys
+  if (clockInterval) {
+    clearInterval(clockInterval);
+    clockInterval = null;
+  }
+  if (scoreInterval) {
+    clearInterval(scoreInterval);
+    scoreInterval = null;
+  }
+});
 
 // Lisää tapahtumakäsittelijät 3D-painikkeille
 const raycaster = new Raycaster();
@@ -206,9 +492,11 @@ window.addEventListener("click", (event) => {
       console.log("No weapon found to animate. Please select a weapon first.");
     }
     return;
-  //}
 });
 
+/* ANIMATIONS */  
+
+// Aseen heitto kohteeseen
 const animateWeaponToTarget = (weapon: Object3D, targetPosition: Vector3) => {
   if (isAnimating) return;
   isAnimating = true;
@@ -232,17 +520,16 @@ const animateWeaponToTarget = (weapon: Object3D, targetPosition: Vector3) => {
       weapon.rotation.y += 0.1; // Pyörii Y-akselin ympäri
     } else {
       // Tarkista, osuuko ase monsteriin
+      let hitSomething = false;
       const raycaster = new Raycaster();
       raycaster.set(weapon.position, targetPosition.clone().sub(weapon.position).normalize());
       const intersects = raycaster.intersectObjects(scene.children, true);
-
-      let hitSomething = false;
 
       for (const intersect of intersects) {
         const monster = intersect.object.parent; // Monsteri on parent-objekti
         if (monster && monster.name.startsWith("monster_")) {
           hitSomething = true;
-          const damage = weapon && weapon.userData.assetPath.includes("pickaxe") ? 1 : 4; // Hakku tekee 1 vahinkoa, muu ase 4
+          const damage = weapon && weapon.userData.assetPath.includes("pickaxe") ? 1 : 4; // Hakku tekee 1 vahinkoa, miekka 4
           monster.userData.health -= damage;
 
           // Päivitä health bar
@@ -340,6 +627,7 @@ const animateWeaponToTarget = (weapon: Object3D, targetPosition: Vector3) => {
   animationLoop();
 };
 
+// Pyöritä valittua asetta paikoillaan "idle"-animaatio
 const rotateWeaponIdle = (weapon: Object3D) => {
   const idleAnimationLoop = () => {
     if (!isAnimating) { // Pyöritä vain, jos animaatio ei ole käynnissä
@@ -360,10 +648,6 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
-let hitTestSourceAvailable = false;
-let hitTestSource: XRHitTestSource | null = null;
-let localReferenceSpace: XRReferenceSpace | null = null;
 
 async function initHitSource() {
   const session = renderer.xr.getSession();
@@ -393,8 +677,6 @@ const reticleMaterial = new MeshBasicMaterial({ color: 0x00ff00 });
 const reticle = new Mesh(reticleGeometry, reticleMaterial);
 reticle.visible = false;
 scene.add(reticle);
-
-let isAnimating = false; // Tila, joka kertoo, onko animaatio käynnissä
 
 const animate = () => {
   renderer.setAnimationLoop((_, frame) => {
@@ -435,55 +717,7 @@ const updateReticle = (frame: XRFrame) => {
   }
 };
 
-// Luo kello-elementti
-const clockDiv = document.createElement("div");
-clockDiv.style.position = "absolute";
-clockDiv.style.top = "10px";
-clockDiv.style.right = "10px";
-clockDiv.style.color = "white";
-clockDiv.style.fontSize = "20px";
-clockDiv.style.fontFamily = "Arial, sans-serif";
-clockDiv.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-clockDiv.style.padding = "5px 10px";
-clockDiv.style.borderRadius = "5px";
-clockDiv.style.zIndex = "1000"; // Näytä UI muiden elementtien päällä
-clockDiv.innerText = "Alive: 0m 0s";
-
-// Lisää kello DOM:iin
-document.body.appendChild(clockDiv);
-
-// Luo scores-elementti
-const scoresDiv = document.createElement("div");
-scoresDiv.style.position = "absolute";
-scoresDiv.style.top = "50px";
-scoresDiv.style.right = "10px";
-scoresDiv.style.color = "white";
-scoresDiv.style.fontSize = "20px";
-scoresDiv.style.fontFamily = "Arial, sans-serif";
-scoresDiv.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-scoresDiv.style.padding = "5px 10px";
-scoresDiv.style.borderRadius = "5px";
-scoresDiv.style.zIndex = "1000"; // Näytä UI muiden elementtien päällä
-scoresDiv.innerText = "Score: 0";
-
-// Lisää pisteet DOM:iin
-document.body.appendChild(scoresDiv);
-
-let score = 0; // Alustetaan pisteet
-
-const updateScores = (newScore: number) => {
-  score += newScore;
-  scoresDiv.innerText = `Score: ${score}`;
-};
-
-// Päivitä kello reaaliajassa
-let startTime = Date.now();
-const updateClock = () => {
-  const elapsedTime = Date.now() - startTime;
-  const minutes = Math.floor(elapsedTime / 60000);
-  const seconds = Math.floor((elapsedTime % 60000) / 1000);
-  clockDiv.innerText = `Alive: ${minutes}m ${seconds}s`;
-};
+/* MONSTERS */
 
 const monsterModels = [
   "./assets/Minecraft_Pigman.glb",
@@ -624,6 +858,8 @@ const startMonsterAttack = (monster: Object3D) => {
   attackAnimation();
 };
 
+// Tämä funktio väläyttää ruudun punaiseksi, kun monsteri osuu pelaajaan
+// Se vähentää myös pelaajan elämää ja tarkistaa, loppuivatko elämät
 const flashScreenRed = () => {
   const overlay = document.createElement("div");
   overlay.style.position = "fixed";
@@ -727,198 +963,3 @@ const stopGame = () => {
   // Lisää "Game Over" -elementti DOM:iin
   document.body.appendChild(gameOverDiv);
 };
-
-// Luo elämät-elementti
-const livesDiv = document.createElement("div");
-livesDiv.style.position = "absolute";
-livesDiv.style.top = "10px";
-livesDiv.style.left = "10px";
-livesDiv.style.display = "flex";
-livesDiv.style.gap = "5px"; // Väli sydänten välillä
-livesDiv.style.zIndex = "1000"; // Näytä UI muiden elementtien päällä
-
-// Lisää 5 sydäntä
-const maxLives = 4;
-let currentLives = maxLives;
-
-for (let i = 0; i < maxLives; i++) {
-  const heart = document.createElement("img");
-  heart.src = "./assets/heart.png"; // Sydänkuvan polku
-  heart.style.width = "30px"; // Sydämen leveys
-  heart.style.height = "30px"; // Sydämen korkeus
-  livesDiv.appendChild(heart);
-}
-
-// Lisää elämät DOM:iin
-document.body.appendChild(livesDiv);
-
-const updateLivesUI = () => {
-  const hearts = livesDiv.querySelectorAll("img");
-  hearts.forEach((heart, index) => {
-    if (index < currentLives) {
-      heart.style.opacity = "1"; // Näytä sydän
-    } else {
-      heart.style.opacity = "0.3"; // Himmenna sydän
-    }
-  });
-};
-
-// Luo inventaario-elementti
-const inventoryDiv = document.createElement("div");
-inventoryDiv.style.position = "absolute";
-inventoryDiv.style.top = "50%"; // Keskelle pystysuunnassa
-inventoryDiv.style.right = "10px"; // Näytön oikeaan reunaan
-inventoryDiv.style.transform = "translateY(-50%)"; // Keskitys pystysuunnassa
-inventoryDiv.style.display = "flex";
-inventoryDiv.style.flexDirection = "column"; // Järjestä blokit pystysuoraan
-inventoryDiv.style.gap = "10px"; // Väli blokkien välillä
-inventoryDiv.style.zIndex = "1000"; // Näytä UI muiden elementtien päällä
-
-// Blokkien tiedot
-const blocks = [
-  { name: "beige", imagePath: "./assets/minecraft_blocks_beige.png", modelPath: "./assets/minecraft_blocks_beige.glb", count: 1 },
-  { name: "brown", imagePath: "./assets/minecraft_blocks_brown.png", modelPath: "./assets/minecraft_blocks_brown.glb", count: 1 },
-  { name: "green", imagePath: "./assets/minecraft_blocks_green.png", modelPath: "./assets/minecraft_blocks_green.glb", count: 1 },
-  { name: "grey", imagePath: "./assets/minecraft_blocks_grey.png", modelPath: "./assets/minecraft_blocks_grey.glb", count: 1 },
-];
-
-// Luo blokit inventaarioon
-blocks.forEach((block) => {
-  const blockDiv = document.createElement("div");
-  blockDiv.classList.add("inventory-item"); // Lisää luokka
-  blockDiv.dataset.blockName = block.name; // Lisää data-attribuutti
-  blockDiv.style.display = "flex";
-  blockDiv.style.flexDirection = "column";
-  blockDiv.style.alignItems = "center";
-  blockDiv.style.cursor = "pointer";
-
-  // Blokin kuva tekstuuri
-  const blockModelDiv = document.createElement("div");
-  blockModelDiv.style.width = "50px";
-  blockModelDiv.style.height = "50px";
-  blockModelDiv.style.backgroundImage = `url('${block.imagePath}')`; // Esikatselukuva
-  blockModelDiv.style.backgroundSize = "cover";
-  blockModelDiv.style.border = "1px solid black";
-  blockModelDiv.style.borderRadius = "5px";
-  blockDiv.appendChild(blockModelDiv);
-
-  // Blokin määrä
-  const blockCount = document.createElement("span");
-  blockCount.classList.add("block-count"); // Lisää luokka
-  blockCount.innerText = `${block.count}`; // Näytä blokin määrä
-  blockCount.style.position = "relative";
-  blockCount.style.top = "30px";
-  blockCount.style.left = "35px";
-  blockCount.style.color = "white";
-  blockCount.style.fontSize = "14px";
-  blockCount.style.fontWeight = "bold";
-  blockCount.style.textShadow = "0 0 5px black"; // Lisää kontrastia
-  blockModelDiv.appendChild(blockCount);
-
-  // Lisää klikkaustoiminnallisuus
-  blockDiv.onclick = () => {
-    if (block.count > 0 && reticle.visible) { // Tarkista, että blokkeja on ja reticle on näkyvissä
-      console.log(`Clicked on block: ${block.name}`);
-      // Lataa blokki ja aseta se rectilen sijaintiin
-      loader.load(
-        block.modelPath,
-        (gltf) => {
-          const blockObject = gltf.scene;
-          blockObject.name = "block";
-          blockObject.scale.set(0.7, 0.7, 0.7); // Skaalaa blokki sopivaksi
-
-          // Laske blokin korkeus dynaamisesti
-          const boundingBox = new Box3().setFromObject(blockObject);
-          const blockHeight = boundingBox.max.y - boundingBox.min.y;
-
-          // Tarkista, onko rectilen sijainnissa jo blokki
-          let highestY = reticle.position.y; // Alkuarvo on rectilen korkeus
-          scene.traverse((object) => {
-            if (object.name === "block") {
-              // Lasketaan vain vaakasuora etäisyys (x ja z)
-              const horizontalDistance = Math.sqrt(
-                Math.pow(object.position.x - reticle.position.x, 2) +
-                Math.pow(object.position.z - reticle.position.z, 2)
-              );
-              if (horizontalDistance < 0.2) { // Jos blokki on tarpeeksi lähellä rectilen sijaintia
-                highestY = Math.max(highestY, object.position.y + blockHeight); // Aseta uusi korkeus edellisen blokin päälle
-              }
-            }
-          });
-
-          // Aseta blokki rectilen sijaintiin tai edellisen päälle
-          blockObject.position.set(reticle.position.x, highestY, reticle.position.z);
-          scene.add(blockObject);
-
-          updateScores(25); // Lisää pisteitä, kun blokki asetetaan
-          console.log(`Placed block: ${block.name} at reticle position.`);
-        },
-        undefined,
-        (error) => {
-          console.error("Error loading block model:", error);
-        }
-      );
-
-      // Vähennä inventaariosta
-      block.count--;
-      blockCount.innerText = `${block.count}`;
-    } else if (!reticle.visible) {
-      console.log("Reticle is not visible. Cannot place block.");
-    } else {
-      console.log(`No ${block.name} blocks left in inventory.`);
-    }
-  };
-
-  inventoryDiv.appendChild(blockDiv);
-});
-
-// Lisää inventaario DOM:iin
-document.body.appendChild(inventoryDiv);
-
-// Piilota UI-elementit aluksi
-inventoryDiv.style.display = "none";
-clockDiv.style.display = "none";
-scoresDiv.style.display = "none";
-livesDiv.style.display = "none";
-
-let clockInterval: ReturnType<typeof setInterval> | null = null;
-let scoreInterval: ReturnType<typeof setInterval> | null = null;
-
-// Lisää WebXR-istunnon aloituskuuntelija
-renderer.xr.addEventListener("sessionstart", () => {
-  console.log("WebXR session started");
-
-  // Näytä UI-elementit
-  inventoryDiv.style.display = "flex";
-  clockDiv.style.display = "block";
-  scoresDiv.style.display = "block";
-  livesDiv.style.display = "flex";
-
-  // Käynnistä kellon ja pisteiden päivitys
-  startTime = Date.now();
-  clockInterval = setInterval(updateClock, 1000);
-  scoreInterval = setInterval(() => {
-    updateScores(10);
-  }, 5000);
-});
-
-// Lisää WebXR-istunnon lopetuskuuntelija
-renderer.xr.addEventListener("sessionend", () => {
-  console.log("WebXR session ended");
-
-  // Piilota UI-elementit
-  inventoryDiv.style.display = "none";
-  clockDiv.style.display = "none";
-  scoresDiv.style.display = "none";
-  livesDiv.style.display = "none";
-
-  // Pysäytä kellon ja pisteiden päivitys
-  if (clockInterval) {
-    clearInterval(clockInterval);
-    clockInterval = null;
-  }
-  if (scoreInterval) {
-    clearInterval(scoreInterval);
-    scoreInterval = null;
-  }
-});

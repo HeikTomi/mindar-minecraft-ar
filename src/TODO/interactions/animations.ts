@@ -1,6 +1,6 @@
 import { Object3D, Vector3, Raycaster } from "three";
 import { scene, camera } from "../core/scene";
-import { blocks } from "../index";
+import { blocks } from "../../index";
 import { loader, getIsAnimating, setIsAnimating } from "../loaders/modelLoader";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer";
 import { updateScores } from "../utils/utils";
